@@ -1,0 +1,77 @@
+
+[functions.instacart-order]
+enabled = true
+verify_jwt = true
+import_map = "./functions/instacart-order/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/instacart-order/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/instacart-order/*.html" ]
+
+[functions.checkout-handler]
+enabled = true
+verify_jwt = true
+import_map = "./functions/checkout-handler/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/checkout-handler/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/checkout-handler/*.html" ]
+
+[functions.meal-planner]
+enabled = true
+verify_jwt = true
+import_map = "./functions/meal-planner/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/meal-planner/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/meal-planner/*.html" ]
+
+[functions.find-recipe-url]
+enabled = true
+verify_jwt = true
+import_map = "./functions/find-recipe-url/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/find-recipe-url/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/find-recipe-url/*.html" ]
+
+[functions.add-ingredients-to-list]
+enabled = true
+verify_jwt = true
+import_map = "./functions/add-ingredients-to-list/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/add-ingredients-to-list/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/add-ingredients-to-list/*.html" ]
+
+[functions.create-kroger-cart]
+enabled = true
+verify_jwt = true
+import_map = "./functions/create-kroger-cart/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/create-kroger-cart/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/create-kroger-cart/*.html" ]
+
+[functions.generate-shopping-list]
+enabled = true
+verify_jwt = true
+import_map = "./functions/generate-shopping-list/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/generate-shopping-list/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/generate-shopping-list/*.html" ]
