@@ -33,11 +33,16 @@ Deno.serve(async (req) => {
     }
 
     // Get secrets
-    const supabaseUrl = Deno.env.get('APP_SUPABASE_URL');
-    const supabaseKey = Deno.env.get('APP_SUPABASE_ANON_KEY');
+    // Get secrets
+    const supabaseUrl = Deno.env.get('APP_SUPABASE_URL') ?? Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('APP_SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY');
 
     if (!supabaseUrl || !supabaseKey) {
-      throw new Error("Secrets are not set.");
+      console.error("Missing secrets in add-ingredients-to-list:", {
+        hasUrl: !!supabaseUrl,
+        hasKey: !!supabaseKey
+      });
+      throw new Error("Secrets are not set. Check Supabase Dashboard.");
     }
 
     // Create authenticated Supabase client
@@ -77,7 +82,7 @@ Deno.serve(async (req) => {
     const newShoppingListItems = ingredients.map(ing => {
       // Scale the quantity
       const newQuantity = ing.quantity * scalingFactor;
-      
+
       // Format the ingredient name with the new, scaled amount
       // e.g., "2.00 cup flour"
       const itemName = `${newQuantity.toFixed(2)} ${ing.measure || ''} ${ing.food}`;

@@ -23,13 +23,20 @@ Deno.serve(async (req) => {
     }
 
     // --- 2. GET SECRETS ---
-    const supabaseUrl = Deno.env.get('APP_SUPABASE_URL');
-    const supabaseKey = Deno.env.get('APP_SUPABASE_ANON_KEY');
+    // --- 2. GET SECRETS ---
+    const supabaseUrl = Deno.env.get('APP_SUPABASE_URL') ?? Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('APP_SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY');
     const appId = Deno.env.get('EDAMAM_APP_ID');
     const appKey = Deno.env.get('EDAMAM_APP_KEY');
 
     if (!supabaseUrl || !supabaseKey || !appId || !appKey) {
-      throw new Error("Secrets are not fully set.");
+      console.error("Missing secrets in find-recipe-url:", {
+        hasUrl: !!supabaseUrl,
+        hasKey: !!supabaseKey,
+        hasAppId: !!appId,
+        hasAppKey: !!appKey
+      });
+      throw new Error("Secrets are not fully set. Check Supabase Dashboard.");
     }
 
     // Create an authenticated Supabase client
@@ -44,48 +51,72 @@ Deno.serve(async (req) => {
 
     const simpleUserId = user.id.replaceAll('-', '').substring(0, 8); // Truncate to 8 characters
 
-    let simpleName = recipe_name; 
-    
+    let simpleName = recipe_name;
+
     // 1. Remove parenthetical descriptions (e.g., (made with avocado...))
-    simpleName = simpleName.replace(/\([^()]*\)/g, '').trim(); 
-    
+    simpleName = simpleName.replace(/\([^()]*\)/g, '').trim();
+
     // 2. Remove secondary ingredients/sides (e.g., , Carrot Sticks)
-    simpleName = simpleName.replace(/,.*/, '').trim();             
-    
+    simpleName = simpleName.replace(/,.*/, '').trim();
+
+    // 3. Remove prepositional phrases (e.g., on Whole Wheat Bread)
     // 3. Remove prepositional phrases (e.g., on Whole Wheat Bread)
     simpleName = simpleName.replace(/ on .*/i, '').trim();
-    simpleName = simpleName.replace(/ with .*/i, '').trim(); 
-    
-    // Fallback: If the name is now empty, just use the original name
-    const finalSearchQuery = simpleName.length > 5 ? simpleName : recipe_name; 
+    simpleName = simpleName.replace(/ with .*/i, '').trim();
+    simpleName = simpleName.replace(/ topped with .*/i, '').trim();
+    simpleName = simpleName.replace(/ served with .*/i, '').trim();
+
+    // Fallback: If the name is shorter than 3 chars, use the original name.
+    // "Mango" is 5 chars, so it will now be used (length > 2).
+    let finalSearchQuery = simpleName.length > 2 ? simpleName : recipe_name;
     console.log("Searching Edamam for:", finalSearchQuery);
 
 
     // --- 3. CALL THE EDAMAM API ---
-    const searchUrl = `https://api.edamam.com/api/recipes/v2?type=public&q=${encodeURIComponent(finalSearchQuery)}&app_id=${appId}&app_key=${appKey}&field=url&field=ingredients&field=yield`;
+    const buildUrl = (q: string) => `https://api.edamam.com/api/recipes/v2?type=public&q=${encodeURIComponent(q)}&app_id=${appId}&app_key=${appKey}&field=url&field=ingredients&field=yield`;
 
-    const edamamResponse = await fetch(searchUrl, {
+    let searchUrl = buildUrl(finalSearchQuery);
+    let edamamResponse = await fetch(searchUrl, {
       method: 'GET',
-      headers: { 
-        'Edamam-Account-User': simpleUserId // Pass the unique ID of the logged-in user
-      }
+      headers: { 'Edamam-Account-User': simpleUserId }
     });
 
-    // *** THIS IS THE DIAGNOSTIC FIX ***
     if (!edamamResponse.ok) {
+      // ... (Error handling is same, just re-using code)
       const status = edamamResponse.status;
-      const errorDetail = await edamamResponse.text(); // Read the specific error text
+      const errorDetail = await edamamResponse.text();
       throw new Error(`Failed to call Edamam API. Status: ${status}. Details: ${errorDetail}`);
     }
 
-    const edamamData = await edamamResponse.json();
+    let edamamData = await edamamResponse.json();
+
+    // --- RETRY LOGIC: If no hits, try simpler keywords ---
+    if (!edamamData.hits || edamamData.hits.length === 0) {
+      console.log(`No hits for "${finalSearchQuery}". Retrying with simplified keywords...`);
+
+      // Strategy: First 3 words of the original name, no punctuation
+      const punctuationRemoved = recipe_name.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "");
+      const keywords = punctuationRemoved.split(/\s+/).slice(0, 3).join(" ");
+
+      if (keywords !== finalSearchQuery) {
+        console.log("Retrying with:", keywords);
+        searchUrl = buildUrl(keywords);
+        edamamResponse = await fetch(searchUrl, {
+          method: 'GET',
+          headers: { 'Edamam-Account-User': simpleUserId }
+        });
+
+        if (edamamResponse.ok) {
+          edamamData = await edamamResponse.json();
+        }
+      }
+    }
 
     if (!edamamData.hits || edamamData.hits.length === 0) {
-      throw new Error(`No recipes found for "${recipe_name}"`);
+      throw new Error(`No recipes found for "${recipe_name}" (searched as "${finalSearchQuery}").`);
     }
 
     // --- SAFELY EXTRACT DATA FROM THE BEST MATCH ---
-    // Defensively access nested properties to prevent runtime errors
     const recipe = edamamData.hits[0]?.recipe;
     const recipeUrl = recipe?.url;
     const ingredients = recipe?.ingredients;
@@ -99,12 +130,12 @@ Deno.serve(async (req) => {
     // --- 4. SAVE THE URL & INGREDIENTS TO THE DATABASE ---
     const { error: dbError } = await supabaseClient
       .from('meal_plan')
-      .update({ 
+      .update({
         recipe_url: recipeUrl,
         ingredients: ingredients,
         servings: servings
       })
-      .eq('id', meal_id); 
+      .eq('id', meal_id);
 
     if (dbError) {
       throw dbError;
@@ -112,7 +143,7 @@ Deno.serve(async (req) => {
 
     // --- 5. SEND THE NEW DATA BACK ---
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         newUrl: recipeUrl,
         ingredients: ingredients,
         servings: servings

@@ -20,15 +20,21 @@ Deno.serve(async (req) => {
 
   try {
     // 1. SETUP & AUTH
-    const supabaseUrl = Deno.env.get('APP_SUPABASE_URL');
-    const supabaseKey = Deno.env.get('APP_SUPABASE_ANON_KEY');
+    // 1. SETUP & AUTH
+    const supabaseUrl = Deno.env.get('APP_SUPABASE_URL') ?? Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('APP_SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY');
     const geminiKey = Deno.env.get('GEMINI_API_KEY');
-    
+
     // We get familySize from the frontend to help the AI scale ingredients
-    const { familySize } = await req.json(); 
+    const { familySize } = await req.json();
 
     if (!supabaseUrl || !supabaseKey || !geminiKey) {
-      throw new Error("Secrets are not fully set.");
+      console.error("Missing secrets in generate-shopping-list:", {
+        hasUrl: !!supabaseUrl,
+        hasKey: !!supabaseKey,
+        hasGemini: !!geminiKey
+      });
+      throw new Error("Secrets are not fully set. Check Supabase Dashboard.");
     }
 
     const supabaseClient = createClient(supabaseUrl, supabaseKey, {
@@ -74,21 +80,23 @@ Deno.serve(async (req) => {
       }
     `;
 
-    // Call Gemini (Using the model we know works: gemini-2.5-flash)
-    const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
+    // --- Call Gemini (Using gemini-flash-latest) ---
+    // 'gemini-flash-latest' is confirmed available.
+    const modelName = 'gemini-flash-latest';
+    const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
     });
 
     if (!aiResponse.ok) {
-        const errText = await aiResponse.text();
-        throw new Error(`AI call failed: ${errText}`);
+      const errText = await aiResponse.text();
+      throw new Error(`AI call failed: ${errText}`);
     }
 
     const aiData = await aiResponse.json();
     let aiText = aiData.candidates[0].content.parts[0].text;
-    
+
     // Clean Markdown
     if (aiText.startsWith("```json")) {
       aiText = aiText.substring(7);
@@ -99,7 +107,7 @@ Deno.serve(async (req) => {
 
     // 4. INTELLIGENTLY MERGE WITH EXISTING SHOPPING LIST
     // We get the current list so we don't accidentally delete things the user manually added.
-    
+
     // A. Get current list from DB
     const { data: currentList } = await supabaseClient
       .from('shopping_list')
@@ -112,9 +120,9 @@ Deno.serve(async (req) => {
     // Load current DB items into map
     currentList?.forEach(item => {
       // Use lowercase key to avoid "Apple" vs "apple" duplicates
-      processingList.set(item.name.toLowerCase(), { 
-        name: item.name, 
-        quantity: item.quantity, 
+      processingList.set(item.name.toLowerCase(), {
+        name: item.name,
+        quantity: item.quantity,
         id: item.id, // Keep ID so we update the existing row
         user_id: user.id
       });
@@ -129,15 +137,15 @@ Deno.serve(async (req) => {
         existing.quantity += newItem.quantity;
       } else {
         // New item! Create it.
-        processingList.set(key, { 
-          name: newItem.name, 
+        processingList.set(key, {
+          name: newItem.name,
           quantity: newItem.quantity,
-          user_id: user.id 
+          user_id: user.id
         });
       }
     });
 
-// D. SEPARATE INTO "INSERTS" AND "UPDATES"
+    // D. SEPARATE INTO "INSERTS" AND "UPDATES"
     // We split the list to avoid the "null id" error.
     const itemsToUpdate: any[] = [];
     const itemsToInsert: any[] = [];
@@ -150,14 +158,14 @@ Deno.serve(async (req) => {
       }
     }
 
- // 5. SAVE TO DATABASE (Two Steps)
+    // 5. SAVE TO DATABASE (Two Steps)
 
     // Step A: Update existing items
     if (itemsToUpdate.length > 0) {
       const { error: updateError } = await supabaseClient
         .from('shopping_list')
         .upsert(itemsToUpdate); // These all have IDs, so upsert works perfectly as an update
-      
+
       if (updateError) throw updateError;
     }
 
@@ -166,14 +174,14 @@ Deno.serve(async (req) => {
       const { error: insertError } = await supabaseClient
         .from('shopping_list')
         .insert(itemsToInsert); // These have NO IDs, so database will auto-generate them
-      
+
       if (insertError) throw insertError;
     }
 
     return new Response(
-      JSON.stringify({ 
-        message: "Shopping list updated!", 
-        count: itemsToUpdate.length + itemsToInsert.length 
+      JSON.stringify({
+        message: "Shopping list updated!",
+        count: itemsToUpdate.length + itemsToInsert.length
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );

@@ -5,8 +5,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 console.log("--- V4 CREATE-KROGER-CART (Dynamic Location) ---");
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 const KROGER_API_BASE = 'https://api.kroger.com/v1';
@@ -48,7 +48,7 @@ async function getLocationId(zipCode: string, token: string): Promise<string> {
 
     const data = await response.json();
     const locationId = data.data?.[0]?.locationId;
-    
+
     if (!locationId) {
         throw new Error(`Could not find a Kroger store near ZIP code ${zipCode}.`);
     }
@@ -62,12 +62,12 @@ function cleanSearchTerm(term: string): string {
     let clean = term;
     clean = clean.replace(/^\s*\d+(\/\d+)?(\.\d+)?\s*(cup|oz|lb|tsp|tbsp|quart|gallon|each)\s*/i, '');
     clean = clean.replace(/^\s*\d+(\/\d+)?(\.\d+)?\s*(bag|can|box|package|jar|container|ct)\s*/i, '');
-    clean = clean.replace(/\([^()]*\)/g, '').trim(); 
-    clean = clean.replace(/,.*/, '').trim();             
+    clean = clean.replace(/\([^()]*\)/g, '').trim();
+    clean = clean.replace(/,.*/, '').trim();
     clean = clean.replace(/ on .*/i, '').trim();
-    clean = clean.replace(/ with .*/i, '').trim(); 
+    clean = clean.replace(/ with .*/i, '').trim();
     clean = clean.replace(/\s+/g, ' ').trim();
-    
+
     const words = clean.split(' ');
     if (words.length > 4) {
         return words.slice(0, 3).join(' ');
@@ -85,11 +85,11 @@ Deno.serve(async (req) => {
         // --- 1. SUPABASE AUTHENTICATION & SECRETS ---
         const { items: rawItems, zipCode } = await req.json() as { items: { name: string, quantity: number }[], zipCode: string }; // <-- GET ZIP CODE
 
-        const supabaseUrl = Deno.env.get('APP_SUPABASE_URL');
-        const supabaseKey = Deno.env.get('APP_SUPABASE_ANON_KEY');
+        const supabaseUrl = Deno.env.get('APP_SUPABASE_URL') ?? Deno.env.get('SUPABASE_URL');
+        const supabaseKey = Deno.env.get('APP_SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY');
         const clientId = Deno.env.get('KROGER_CLIENT_ID');
         const clientSecret = Deno.env.get('KROGER_CLIENT_SECRET');
-        
+
         if (!supabaseUrl || !supabaseKey || !clientId || !clientSecret) {
             throw new Error("Missing one or more required secrets (Supabase or Kroger).");
         }
@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
         if (authError || !user) {
             throw new Error("User not authenticated.");
         }
-        
+
         // --- 2. KROGER API AUTHENTICATION & LOCATION LOOKUP ---
         const krogerToken = await getKrogerToken(clientId, clientSecret);
         const authHeader = { 'Authorization': `Bearer ${krogerToken}` };
@@ -114,7 +114,7 @@ Deno.serve(async (req) => {
         // --- 3. PROCESS EACH ITEM: FIND UPC ---
         const itemsWithUpc = [];
         for (const item of rawItems) {
-            const cleanedName = cleanSearchTerm(item.name); 
+            const cleanedName = cleanSearchTerm(item.name);
 
             if (!cleanedName) {
                 console.warn(`Skipping item: "${item.name}" (Cleaned to empty string)`);
@@ -123,7 +123,7 @@ Deno.serve(async (req) => {
 
             // A. Find the product's UPC code
             const productSearchUrl = new URL(`${KROGER_API_BASE}/products`);
-            productSearchUrl.searchParams.set('filter.term', cleanedName); 
+            productSearchUrl.searchParams.set('filter.term', cleanedName);
             productSearchUrl.searchParams.set('filter.locationId', locationId); // Use the DYNAMIC ID
             productSearchUrl.searchParams.set('filter.limit', '1');
 
@@ -138,9 +138,9 @@ Deno.serve(async (req) => {
             const productUpc = productData.data?.[0]?.upc;
 
             if (productUpc) {
-                itemsWithUpc.push({ 
-                    upc: productUpc, 
-                    quantity: item.quantity, 
+                itemsWithUpc.push({
+                    upc: productUpc,
+                    quantity: item.quantity,
                     name: item.name,
                     searchUsed: cleanedName
                 });
@@ -158,8 +158,8 @@ Deno.serve(async (req) => {
 
         // --- 4. SEND MAPPED PRODUCTS AND LOCATION ID ---
         return new Response(
-            JSON.stringify({ 
-                success: true, 
+            JSON.stringify({
+                success: true,
                 message: "UPC mapping complete. Cart creation requires user authorization.",
                 checkoutUrl: `https://kroger.com/cart?action=view`,
                 mappedItems: itemsWithUpc,

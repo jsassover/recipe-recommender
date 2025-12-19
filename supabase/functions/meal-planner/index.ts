@@ -12,7 +12,7 @@ interface Meal {
   day_of_week: string;
   meal_type: string;
   recipe_name: string;
-  user_id: string; 
+  user_id: string;
 }
 
 interface AIResponse {
@@ -26,12 +26,17 @@ Deno.serve(async (req) => {
 
   try {
     // --- 1. SETUP ---
-    const supabaseUrl = Deno.env.get('APP_SUPABASE_URL');
-    const supabaseKey = Deno.env.get('APP_SUPABASE_ANON_KEY');
+    const supabaseUrl = Deno.env.get('APP_SUPABASE_URL') ?? Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('APP_SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY');
     const geminiKey = Deno.env.get('GEMINI_API_KEY');
 
     if (!supabaseUrl || !supabaseKey || !geminiKey) {
-      throw new Error("Secrets are not fully set.");
+      console.error("Missing secrets:", {
+        hasUrl: !!supabaseUrl,
+        hasKey: !!supabaseKey,
+        hasGemini: !!geminiKey
+      });
+      throw new Error("Secrets are not fully set. Check Supabase Dashboard -> Edge Functions -> Secrets.");
     }
 
     const { familySize, dietaryRestrictions } = await req.json();
@@ -39,12 +44,12 @@ Deno.serve(async (req) => {
     const supabaseClient = createClient(supabaseUrl, supabaseKey, {
       global: { headers: { Authorization: req.headers.get('Authorization')! } }
     });
-    
+
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
     if (authError) throw authError;
 
     // --- 2. PROMPT ---
-const prompt = `
+    const prompt = `
       You are a creative, professional chef and family meal planner. 
       Today is ${new Date().toISOString()}.
       
@@ -65,10 +70,11 @@ const prompt = `
         ]
       }
     `;
-    
-    // --- 3. CALL GOOGLE AI (Using gemini-2.0-flash) ---
-    // We use the v1beta endpoint which supports the newer 2.0 models
-    const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
+
+    // --- 3. CALL GOOGLE AI (Using gemini-flash-latest) ---
+    // 'gemini-flash-latest' is confirmed available in the user's model list.
+    const modelName = 'gemini-flash-latest';
+    let aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -78,16 +84,21 @@ const prompt = `
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
+      console.error(`Attempt with ${modelName} failed:`, errorText);
       throw new Error(`Failed to call Google AI API: ${errorText}`);
     }
 
     const aiData = await aiResponse.json();
-    let aiText = aiData.candidates[0].content.parts[0].text;
+    let aiText = aiData.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!aiText) {
+      throw new Error("AI returned no text. Full response: " + JSON.stringify(aiData));
+    }
 
     // Clean Markdown
     if (aiText.startsWith("```json")) {
-      aiText = aiText.substring(7); 
-      aiText = aiText.substring(0, aiText.lastIndexOf("```")); 
+      aiText = aiText.substring(7);
+      aiText = aiText.substring(0, aiText.lastIndexOf("```"));
     }
 
     const { plan }: AIResponse = JSON.parse(aiText);
@@ -106,7 +117,7 @@ const prompt = `
     const { error: dbError } = await supabaseClient
       .from('meal_plan')
       .insert(mealsWithUser);
-      
+
     if (dbError) throw dbError;
 
     return new Response(

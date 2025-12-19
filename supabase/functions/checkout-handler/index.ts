@@ -24,8 +24,8 @@ Deno.serve(async (req) => {
   try {
     // 1. GET SECRETS
     const instacartKey = Deno.env.get('INSTACART_API_KEY');
-    const supabaseUrl = Deno.env.get('APP_SUPABASE_URL');
-    const supabaseKey = Deno.env.get('APP_SUPABASE_ANON_KEY');
+    const supabaseUrl = Deno.env.get('APP_SUPABASE_URL') ?? Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('APP_SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY');
 
     if (!instacartKey || !supabaseUrl || !supabaseKey) {
       throw new Error("Missing API Keys (Instacart or Supabase).");
@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
       .eq('user_id', user.id);
 
     if (dbError) throw dbError;
-    
+
     if (!items || items.length === 0) {
       throw new Error("Your shopping list is empty! Add items before ordering.");
     }
@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
     // 6. RETURN THE CHECKOUT URL
     // Instacart returns a 'url' that we send back to the frontend
     const checkoutUrl = instacartData.url;
-    
+
     console.log("Success! Checkout URL generated:", checkoutUrl);
 
     return new Response(
