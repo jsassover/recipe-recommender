@@ -21,7 +21,7 @@ This is an AI-powered meal planning and shopping list application.
 **Frontend:** React 18 with Vite
 **Backend:** Supabase (PostgreSQL + Edge Functions in Deno/TypeScript)
 **AI:** Google Gemini API (meal generation, ingredient extraction)
-**External APIs:** Edamam (recipe search), Instacart (checkout), Kroger (product lookup)
+**External APIs:** Edamam (recipe search), Instacart (checkout)
 
 ### Data Flow
 
@@ -45,13 +45,11 @@ React Frontend → Supabase Auth → Edge Functions → External APIs
 | `generate-shopping-list` | Extracts/consolidates ingredients from meal plan |
 | `add-ingredients-to-list` | Scales recipe ingredients by family size |
 | `checkout-handler` | Creates Instacart checkout cart |
-| `create-kroger-cart` | Maps items to Kroger UPCs by ZIP code |
 
 ### Frontend Components (src/)
 
 - `App.jsx`: Main app with auth, shopping list CRUD, Instacart integration
 - `MealPlanner.jsx`: Weekly meal plan UI with Gemini generation and recipe URL lookup
-- `ShoppingList.jsx`: Alternative component with Kroger-specific features
 - `supabaseClient.js`: Supabase client initialization
 
 ## Environment Variables
@@ -64,7 +62,6 @@ React Frontend → Supabase Auth → Edge Functions → External APIs
 - `GEMINI_API_KEY`
 - `EDAMAM_APP_ID`, `EDAMAM_APP_KEY`
 - `INSTACART_API_KEY`
-- `KROGER_CLIENT_ID`, `KROGER_CLIENT_SECRET`
 - `APP_SUPABASE_URL`, `APP_SUPABASE_ANON_KEY`
 
 ## Key Patterns
