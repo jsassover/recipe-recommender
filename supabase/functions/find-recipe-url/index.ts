@@ -1,13 +1,133 @@
 // supabase/functions/find-recipe-url/index.ts
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-console.log("--- V5 FIND-RECIPE-URL FUNCTION (with image support) ---");
+console.log("--- V6 FIND-RECIPE-URL FUNCTION (with trusted domain filtering) ---");
 
 // CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Trusted recipe domains whitelist
+// Only recipes from these domains will be returned to users
+const TRUSTED_DOMAINS = [
+  // Major recipe sites
+  'allrecipes.com',
+  'foodnetwork.com',
+  'food.com',
+  'epicurious.com',
+  'bonappetit.com',
+  'seriouseats.com',
+  'simplyrecipes.com',
+  'tasty.co',
+  'delish.com',
+  'myrecipes.com',
+  'cookinglight.com',
+  'eatingwell.com',
+  'food52.com',
+  'thekitchn.com',
+  'smittenkitchen.com',
+  'budgetbytes.com',
+  'minimalistbaker.com',
+  'skinnytaste.com',
+  'halfbakedharvest.com',
+  'pinchofyum.com',
+  'cookieandkate.com',
+  'loveandlemons.com',
+  'damndelicious.net',
+  'gimmesomeoven.com',
+  'recipetineats.com',
+  'sallysbakingaddiction.com',
+  'cafedelites.com',
+  'natashaskitchen.com',
+  'therecipecritic.com',
+  'hostthetoast.com',
+
+  // News/magazine sites with recipes
+  'nytimes.com',
+  'washingtonpost.com',
+  'bbc.co.uk',
+  'bbcgoodfood.com',
+  'theguardian.com',
+  'saveur.com',
+  'marthastewart.com',
+  'realsimple.com',
+  'southernliving.com',
+  'tasteofhome.com',
+  'countryliving.com',
+  'goodhousekeeping.com',
+  'womansday.com',
+  'bhg.com',
+
+  // Cooking blogs & chef sites
+  'jamieoliver.com',
+  'gordonramsay.com',
+  'barefootcontessa.com',
+  'pioneerwoman.com',
+  'chefsteps.com',
+  'americastestkitchen.com',
+  'cooksillustrated.com',
+  'kingarthurbaking.com',
+
+  // Health & diet focused
+  'healthyrecipesblogs.com',
+  'wellplated.com',
+  'themediterraneandish.com',
+  'wholesomeyum.com',
+  'paleoleap.com',
+  'detoxinista.com',
+
+  // International cuisine
+  'justonecookbook.com',
+  'maangchi.com',
+  'indianhealthyrecipes.com',
+  'mexicanplease.com',
+  'ricardocuisine.com',
+  'finedininglovers.com',
+
+  // Other reputable sites
+  'yummly.com',
+  'chowhound.com',
+  'spoonacular.com',
+  'feastingathome.com',
+  'onceuponachef.com',
+  'inspiredtaste.net',
+  'noracooks.com',
+  'rainbowplantlife.com',
+  '101cookbooks.com',
+  'davidlebovitz.com',
+];
+
+/**
+ * Check if a URL is from a trusted domain
+ */
+function isTrustedUrl(url: string): boolean {
+  try {
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname.toLowerCase();
+
+    // Check if hostname ends with any trusted domain
+    return TRUSTED_DOMAINS.some(domain =>
+      hostname === domain || hostname.endsWith('.' + domain)
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Find the first recipe from a trusted domain in the search results
+ */
+function findTrustedRecipe(hits: any[]): any | null {
+  for (const hit of hits) {
+    const recipe = hit?.recipe;
+    if (recipe?.url && isTrustedUrl(recipe.url)) {
+      return recipe;
+    }
+  }
+  return null;
+}
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
@@ -68,7 +188,7 @@ Deno.serve(async (req) => {
     console.log("Searching Edamam for:", finalSearchQuery);
 
     // --- 3. CALL THE EDAMAM API ---
-    // Request image field in addition to url, ingredients, and yield
+    // Request more results to increase chances of finding a trusted source
     const buildUrl = (q: string) => `https://api.edamam.com/api/recipes/v2?type=public&q=${encodeURIComponent(q)}&app_id=${appId}&app_key=${appKey}&field=url&field=ingredients&field=yield&field=image&field=images`;
 
     let searchUrl = buildUrl(finalSearchQuery);
@@ -110,19 +230,35 @@ Deno.serve(async (req) => {
       throw new Error(`No recipes found for "${recipe_name}" (searched as "${finalSearchQuery}").`);
     }
 
-    // --- SAFELY EXTRACT DATA FROM THE BEST MATCH ---
-    const recipe = edamamData.hits[0]?.recipe;
-    const recipeUrl = recipe?.url;
-    const ingredients = recipe?.ingredients;
-    const servings = recipe?.yield;
+    // --- FIND FIRST TRUSTED RECIPE ---
+    const recipe = findTrustedRecipe(edamamData.hits);
+
+    if (!recipe) {
+      // Log which domains we rejected for debugging
+      const rejectedDomains = edamamData.hits
+        .map((hit: any) => {
+          try {
+            return new URL(hit?.recipe?.url).hostname;
+          } catch {
+            return 'invalid-url';
+          }
+        })
+        .slice(0, 5);
+      console.log("Rejected untrusted domains:", rejectedDomains);
+
+      throw new Error(`No trusted recipe sources found for "${recipe_name}". All results were from untrusted domains.`);
+    }
+
+    const recipeUrl = recipe.url;
+    const ingredients = recipe.ingredients;
+    const servings = recipe.yield;
+
+    console.log("Found trusted recipe from:", new URL(recipeUrl).hostname);
 
     // Extract image URL - try different sizes
-    // Edamam provides: image (default), images.THUMBNAIL, images.SMALL, images.REGULAR, images.LARGE
     let imageUrl = recipe?.image || null;
 
-    // Try to get a better quality image if available
     if (recipe?.images) {
-      // Prefer REGULAR size (300x300) for meal cards, fall back to others
       imageUrl = recipe.images.REGULAR?.url ||
                  recipe.images.SMALL?.url ||
                  recipe.images.THUMBNAIL?.url ||
@@ -130,10 +266,8 @@ Deno.serve(async (req) => {
                  null;
     }
 
-    console.log("Found image URL:", imageUrl);
-
     // Validate that we got the essential data we need
-    if (!recipe || !recipeUrl || !ingredients || !servings) {
+    if (!recipeUrl || !ingredients || !servings) {
       throw new Error(`API response for "${recipe_name}" was incomplete or malformed.`);
     }
 
