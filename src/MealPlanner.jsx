@@ -25,6 +25,7 @@ function groupMealsByDay(meals) {
         recipe_name: meal.recipe_name,
         recipe_url: meal.recipe_url,
         image_url: meal.image_url,
+        ingredients: meal.ingredients,
         user_id: meal.user_id
       };
     }
@@ -64,6 +65,8 @@ export default function MealPlanner() {
   const [familySize, setFamilySize] = useState(4);
   const [dietaryRestrictions, setDietaryRestrictions] = useState("");
   const [loadingMealId, setLoadingMealId] = useState(null);
+  const [addingIngredientsId, setAddingIngredientsId] = useState(null);
+  const [regeneratingId, setRegeneratingId] = useState(null);
 
   useEffect(() => {
     fetchPlan();
@@ -73,7 +76,7 @@ export default function MealPlanner() {
     setError(null);
     const { data, error } = await supabase
       .from('meal_plan')
-      .select('id, day_of_week, meal_type, recipe_name, recipe_url, image_url, user_id')
+      .select('id, day_of_week, meal_type, recipe_name, recipe_url, image_url, ingredients, user_id')
       .order('day_of_week');
 
     if (error) {
@@ -191,11 +194,77 @@ export default function MealPlanner() {
     setLoading(false);
   };
 
+  const addMealIngredients = async (day, mealType) => {
+    const meal = mealPlan[day][mealType];
+    if (!meal) return;
+
+    if (!meal.ingredients || meal.ingredients.length === 0) {
+      setError('No ingredients found. Click "Find Recipe" first to fetch ingredients.');
+      return;
+    }
+
+    setAddingIngredientsId(meal.id);
+    setError(null);
+
+    const { data, error } = await supabase.functions.invoke('add-meal-ingredients', {
+      body: { meal_id: meal.id, familySize }
+    });
+
+    if (error) {
+      console.error('Error adding ingredients:', error);
+      setError('Could not add ingredients to shopping list.');
+    } else {
+      alert(`Added ${data.count} ingredients from "${meal.recipe_name}" to your list!`);
+    }
+    setAddingIngredientsId(null);
+  };
+
+  const regenerateMeal = async (day, mealType) => {
+    const meal = mealPlan[day][mealType];
+    if (!meal) return;
+
+    setRegeneratingId(meal.id);
+    setError(null);
+
+    const { data, error } = await supabase.functions.invoke('regenerate-meal', {
+      body: {
+        meal_id: meal.id,
+        day_of_week: day,
+        meal_type: mealType,
+        dietaryRestrictions,
+        currentRecipeName: meal.recipe_name
+      }
+    });
+
+    if (error) {
+      console.error('Error regenerating meal:', error);
+      setError('Could not regenerate meal.');
+    } else if (data.recipe_name) {
+      setMealPlan(prevPlan => ({
+        ...prevPlan,
+        [day]: {
+          ...prevPlan[day],
+          [mealType]: {
+            ...prevPlan[day][mealType],
+            recipe_name: data.recipe_name,
+            recipe_url: null,
+            image_url: null,
+            ingredients: null
+          }
+        }
+      }));
+    }
+    setRegeneratingId(null);
+  };
+
   const days = Object.keys(mealPlan);
 
   const renderMealCell = (day, mealType) => {
     const meal = mealPlan[day]?.[mealType];
     const isLoadingThis = loadingMealId === meal?.id;
+    const isAddingIngredients = addingIngredientsId === meal?.id;
+    const isRegenerating = regeneratingId === meal?.id;
+    const hasIngredients = meal?.ingredients && meal.ingredients.length > 0;
 
     if (!meal) {
       return (
@@ -238,7 +307,7 @@ export default function MealPlanner() {
         <div className="meal-cell-actions">
           <button
             onClick={() => findRecipe(day, mealType)}
-            disabled={loading || isLoadingThis || !meal.id}
+            disabled={loading || isLoadingThis || isRegenerating || !meal.id}
             className="btn-secondary btn-sm"
           >
             {isLoadingThis ? (
@@ -250,7 +319,38 @@ export default function MealPlanner() {
               'Find Recipe'
             )}
           </button>
+          <button
+            onClick={() => regenerateMeal(day, mealType)}
+            disabled={loading || isLoadingThis || isRegenerating || !meal.id}
+            className="btn-ghost btn-sm"
+            title="Generate a new recipe for this meal"
+          >
+            {isRegenerating ? (
+              <>
+                <span className="loading-spinner"></span>
+              </>
+            ) : (
+              '↻'
+            )}
+          </button>
         </div>
+
+        {hasIngredients && (
+          <button
+            onClick={() => addMealIngredients(day, mealType)}
+            disabled={loading || isAddingIngredients}
+            className="btn-primary btn-sm meal-add-ingredients-btn"
+          >
+            {isAddingIngredients ? (
+              <>
+                <span className="loading-spinner"></span>
+                Adding...
+              </>
+            ) : (
+              '+ Add to List'
+            )}
+          </button>
+        )}
 
         {meal.recipe_url && (
           <a

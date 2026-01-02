@@ -366,6 +366,11 @@
   margin-top: var(--space-sm);
 }
 
+.meal-add-ingredients-btn {
+  width: 100%;
+  margin-top: var(--space-sm);
+}
+
 /* Error Message */
 .error-message {
   padding: var(--space-md);

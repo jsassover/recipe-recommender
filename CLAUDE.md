@@ -41,8 +41,10 @@ React Frontend → Supabase Auth → Edge Functions → External APIs
 | Function | Purpose |
 |----------|---------|
 | `meal-planner` | Generates 7-day meal plans via Gemini AI |
+| `regenerate-meal` | Regenerates a single meal via Gemini AI |
 | `find-recipe-url` | Searches Edamam for recipe URLs |
 | `generate-shopping-list` | Extracts/consolidates ingredients from meal plan |
+| `add-meal-ingredients` | Adds a single meal's ingredients to shopping list |
 | `add-ingredients-to-list` | Scales recipe ingredients by family size |
 | `checkout-handler` | Creates Instacart checkout cart |
 
