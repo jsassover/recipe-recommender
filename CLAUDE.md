@@ -33,8 +33,9 @@ React Frontend → Supabase Auth → Edge Functions → External APIs
 
 ### Database Tables
 
-- `shopping_list`: id, name, quantity, user_id
-- `meal_plan`: id, user_id, day_of_week, meal_type, recipe_name, recipe_url, ingredients (JSON), servings
+- `shopping_list`: id, name, quantity, category, user_id
+- `meal_plan`: id, user_id, day_of_week, meal_type, recipe_name, recipe_url, ingredients (JSON), servings, image_url
+- `pantry`: id, name, category, user_id, created_at
 
 ### Edge Functions (supabase/functions/)
 
@@ -50,8 +51,11 @@ React Frontend → Supabase Auth → Edge Functions → External APIs
 
 ### Frontend Components (src/)
 
-- `App.jsx`: Main app with auth, shopping list CRUD, Instacart integration
+- `App.jsx`: Main app with auth and tab navigation (React Router)
 - `MealPlanner.jsx`: Weekly meal plan UI with Gemini generation and recipe URL lookup
+- `pages/MealPlanPage.jsx`: Meal planning page wrapper
+- `pages/ShoppingListPage.jsx`: Shopping list with category grouping and pantry integration
+- `pages/PantryPage.jsx`: Pantry management for commonly-used ingredients
 - `supabaseClient.js`: Supabase client initialization
 
 ## Environment Variables
