@@ -12,6 +12,7 @@ function ShoppingListApp({ session }) {
   const [newItemName, setNewItemName] = useState('');
   const [newItemQuantity, setNewItemQuantity] = useState(1);
   const [selectedItems, setSelectedItems] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const user = session.user;
 
   useEffect(() => {
@@ -19,6 +20,7 @@ function ShoppingListApp({ session }) {
   }, []);
 
   const fetchItems = async () => {
+    setIsLoading(true);
     const { data, error } = await supabase
       .from('shopping_list')
       .select('*')
@@ -26,6 +28,7 @@ function ShoppingListApp({ session }) {
 
     if (error) console.error('Error fetching items:', error);
     else setItems(data);
+    setIsLoading(false);
   };
 
   const addItem = async (e) => {
@@ -40,7 +43,7 @@ function ShoppingListApp({ session }) {
         user_id: user.id
       })
       .select();
-      
+
     if (error) {
       console.error('Error adding item:', error.message);
     } else {
@@ -50,7 +53,6 @@ function ShoppingListApp({ session }) {
     }
   };
 
-  // Handle checking/unchecking a single box
   const handleCheckboxChange = (itemId) => {
     if (selectedItems.includes(itemId)) {
       setSelectedItems(prev => prev.filter(id => id !== itemId));
@@ -59,18 +61,14 @@ function ShoppingListApp({ session }) {
     }
   };
 
-  // --- NEW: Handle Select All / Deselect All ---
   const handleSelectAll = () => {
     if (selectedItems.length === items.length) {
-      // If all are currently selected, clear selection
       setSelectedItems([]);
     } else {
-      // Otherwise, select every single item ID
       setSelectedItems(items.map(item => item.id));
     }
   };
 
-  // Delete all selected items
   const deleteSelectedItems = async () => {
     if (selectedItems.length === 0) return;
 
@@ -100,7 +98,6 @@ function ShoppingListApp({ session }) {
 
   const handleOrder = async () => {
     console.log('Building Instacart cart...');
-    // Prepare the items to be sent to the function
     const itemsPayload = items.map(item => ({
         name: item.name,
         quantity: item.quantity
@@ -124,111 +121,140 @@ function ShoppingListApp({ session }) {
     await supabase.auth.signOut();
   };
 
-  // Check if all items are currently selected (for button text)
   const isAllSelected = items.length > 0 && selectedItems.length === items.length;
 
   return (
-    <div className="App">
-      <button onClick={handleSignOut} style={{ float: 'right' }}>Sign Out</button>
-      <h1>My Shopping List</h1>
-      <p>Welcome, {session.user.email}!</p>
-
-      {/* --- Add Item Form --- */}
-      <form onSubmit={addItem}>
-        <input
-          type="text"
-          placeholder="Add an item (e.g., Apples)"
-          value={newItemName}
-          onChange={(e) => setNewItemName(e.target.value)}
-        />
-        <input
-          type="number"
-          min="1"
-          value={newItemQuantity}
-          onChange={(e) => setNewItemQuantity(Number(e.target.value))}
-        />
-        <button type="submit">Add</button>
-      </form>
-
-      {/* --- ACTION BUTTONS (Select All & Delete) --- */}
-      {items.length > 0 && (
-        <div style={{ display: 'flex', gap: '10px', margin: '15px 0' }}>
-          
-          {/* 1. SELECT ALL BUTTON */}
-          <button 
-            onClick={handleSelectAll}
-            style={{ 
-              backgroundColor: '#ccc', 
-              color: 'black', 
-              border: 'none', 
-              cursor: 'pointer', 
-              padding: '5px 10px', 
-              borderRadius: '5px',
-              fontSize: '14px'
-            }}
-          >
-            {isAllSelected ? "Deselect All" : "Select All"}
+    <div className="app">
+      {/* Header */}
+      <header className="app-header">
+        <h1>Meal Planner</h1>
+        <div className="user-info">
+          <span>{session.user.email}</span>
+          <button onClick={handleSignOut} className="btn-ghost btn-sm">
+            Sign Out
           </button>
+        </div>
+      </header>
 
-          {/* 2. BULK DELETE BUTTON (Only shows if items selected) */}
-          {selectedItems.length > 0 && (
-            <button 
-              onClick={deleteSelectedItems}
-              style={{ 
-                backgroundColor: '#ff4d4d', 
-                color: 'white', 
-                border: 'none', 
-                cursor: 'pointer', 
-                padding: '5px 10px', 
-                borderRadius: '5px',
-                fontSize: '14px'
-              }}
-            >
-              Delete Selected ({selectedItems.length})
+      {/* Main Content */}
+      <main className="main-content container">
+        {/* Shopping List Section */}
+        <section className="shopping-section">
+          <h2>Shopping List</h2>
+
+          {/* Add Item Form */}
+          <form onSubmit={addItem} className="add-item-form">
+            <input
+              type="text"
+              className="item-name-input"
+              placeholder="Add an item (e.g., Apples)"
+              value={newItemName}
+              onChange={(e) => setNewItemName(e.target.value)}
+            />
+            <input
+              type="number"
+              className="quantity-input"
+              min="1"
+              value={newItemQuantity}
+              onChange={(e) => setNewItemQuantity(Number(e.target.value))}
+            />
+            <button type="submit" className="btn-primary">
+              Add
             </button>
-          )}
+          </form>
+
+          {/* Shopping List Container */}
+          <div className="shopping-list-container">
+            {/* List Actions Bar */}
+            {items.length > 0 && (
+              <div className="list-actions">
+                <div className="list-actions-left">
+                  <button
+                    onClick={handleSelectAll}
+                    className="btn-ghost btn-sm"
+                  >
+                    {isAllSelected ? "Deselect All" : "Select All"}
+                  </button>
+                  {selectedItems.length > 0 && (
+                    <span className="select-count">
+                      {selectedItems.length} selected
+                    </span>
+                  )}
+                </div>
+                <div className="list-actions-right">
+                  {selectedItems.length > 0 && (
+                    <button
+                      onClick={deleteSelectedItems}
+                      className="btn-danger btn-sm"
+                    >
+                      Delete Selected
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Shopping List */}
+            {isLoading ? (
+              <div className="empty-state">
+                <div className="loading-spinner"></div>
+                <p className="mt-md">Loading your list...</p>
+              </div>
+            ) : items.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-state-icon">🛒</div>
+                <h3>Your list is empty</h3>
+                <p>Add items above to get started!</p>
+              </div>
+            ) : (
+              <ul className="shopping-list">
+                {items.map(item => (
+                  <li
+                    key={item.id}
+                    className={`shopping-item ${selectedItems.includes(item.id) ? 'checked' : ''}`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="item-checkbox"
+                      checked={selectedItems.includes(item.id)}
+                      onChange={() => handleCheckboxChange(item.id)}
+                    />
+                    <div className="item-content">
+                      <span className="item-quantity-badge">{item.quantity}</span>
+                      <span className="item-text">{item.name}</span>
+                    </div>
+                    <button
+                      onClick={() => deleteItem(item.id)}
+                      className="item-delete-btn"
+                      aria-label="Delete item"
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+
+        {/* Section Divider */}
+        <div className="section-divider">
+          <span>Meal Planning</span>
+        </div>
+
+        {/* Meal Planner Component */}
+        <MealPlanner />
+      </main>
+
+      {/* Sticky Order Footer */}
+      {items.length > 0 && (
+        <div className="sticky-order-footer">
+          <button onClick={handleOrder} className="order-button">
+            <span>🛒</span>
+            Order with Instacart ({items.length} items)
+          </button>
         </div>
       )}
-
-      {/* --- The List Itself --- */}
-      <ul style={{ listStyle: 'none', padding: 0 }}>
-        {items.length === 0 ? (
-          <p>Your list is empty. Add something!</p>
-        ) : (
-          items.map(item => (
-            <li key={item.id} style={{ display: 'flex', alignItems: 'center', margin: '5px 0', borderBottom: '1px solid #eee', paddingBottom: '5px' }}>
-              
-              {/* Checkbox */}
-              <input 
-                type="checkbox"
-                checked={selectedItems.includes(item.id)}
-                onChange={() => handleCheckboxChange(item.id)}
-                style={{ marginRight: '10px', width: '20px', height: '20px', cursor: 'pointer' }}
-              />
-              
-              {/* Item Name */}
-              <span style={{ flexGrow: 1, textAlign: 'left' }}>
-                {item.quantity}x {item.name}
-              </span>
-              
-              {/* Single Delete X */}
-              <button onClick={() => deleteItem(item.id)} style={{ fontSize: '10px', marginLeft: '10px' }}>
-                X
-              </button>
-            </li>
-          ))
-        )}
-      </ul>
-
-      <hr />
-      <button onClick={handleOrder} style={{ marginTop: '20px', fontSize: '16px' }}>
-        Order with Instacart
-      </button>
-
-      <hr style={{ marginTop: '40px' }}/>
-      
-      {/* The Meal Planner Component */}
-      <MealPlanner />
     </div>
   );
 }
@@ -251,8 +277,24 @@ function App() {
 
   if (!session) {
     return (
-      <div style={{ maxWidth: '400px', margin: '50px auto' }}>
-        <Auth supabaseClient={supabase} appearance={{ theme: ThemeSupa }} />
+      <div className="auth-container">
+        <div className="auth-card">
+          <h1>Meal Planner</h1>
+          <Auth
+            supabaseClient={supabase}
+            appearance={{
+              theme: ThemeSupa,
+              variables: {
+                default: {
+                  colors: {
+                    brand: '#5ebd21',
+                    brandAccent: '#4a9a1a',
+                  },
+                },
+              },
+            }}
+          />
+        </div>
       </div>
     )
   } else {
