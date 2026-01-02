@@ -34,6 +34,15 @@ const COMMON_STAPLES = {
   'Beverages': ['Coffee', 'Tea']
 };
 
+// Convert string to Title Case
+function toTitleCase(str) {
+  return str
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 // Group items by category
 function groupByCategory(items) {
   const grouped = {};
@@ -65,6 +74,7 @@ function groupByCategory(items) {
 export default function PantryPage() {
   const [pantryItems, setPantryItems] = useState([]);
   const [newItemName, setNewItemName] = useState('');
+  const [newItemQuantity, setNewItemQuantity] = useState(1);
   const [newItemCategory, setNewItemCategory] = useState('Pantry');
   const [isLoading, setIsLoading] = useState(true);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -86,45 +96,110 @@ export default function PantryPage() {
     setIsLoading(false);
   };
 
+  const findExistingItem = (name) => {
+    const normalizedName = name.trim().toLowerCase();
+    return pantryItems.find(item => item.name.toLowerCase() === normalizedName);
+  };
+
   const addItem = async (e) => {
     e.preventDefault();
     if (newItemName.trim() === '') return;
 
+    const formattedName = toTitleCase(newItemName.trim());
+    const existingItem = findExistingItem(formattedName);
+
+    if (existingItem) {
+      // Show confirmation dialog
+      const confirmed = window.confirm(
+        `You already have "${existingItem.name}" in your pantry (quantity: ${existingItem.quantity || 1}).\n\nDo you want to add ${newItemQuantity} more?`
+      );
+
+      if (confirmed) {
+        // Update existing item quantity
+        const newQuantity = (existingItem.quantity || 1) + newItemQuantity;
+        const { error } = await supabase
+          .from('pantry')
+          .update({ quantity: newQuantity })
+          .eq('id', existingItem.id);
+
+        if (error) {
+          console.error('Error updating item:', error.message);
+        } else {
+          setPantryItems(prev =>
+            prev.map(item =>
+              item.id === existingItem.id
+                ? { ...item, quantity: newQuantity }
+                : item
+            )
+          );
+          setNewItemName('');
+          setNewItemQuantity(1);
+        }
+      }
+      // If not confirmed, just clear the form
+      return;
+    }
+
+    // Add new item
     const { data: { user } } = await supabase.auth.getUser();
 
     const { data, error } = await supabase
       .from('pantry')
       .insert({
-        name: newItemName.trim(),
+        name: formattedName,
+        quantity: newItemQuantity,
         category: newItemCategory,
         user_id: user.id
       })
       .select();
 
     if (error) {
-      if (error.code === '23505') {
-        alert('This item is already in your pantry!');
-      } else {
-        console.error('Error adding item:', error.message);
-      }
+      console.error('Error adding item:', error.message);
     } else {
       setPantryItems(prev => [...prev, data[0]]);
       setNewItemName('');
+      setNewItemQuantity(1);
     }
   };
 
   const addQuickItem = async (name, category) => {
     const { data: { user } } = await supabase.auth.getUser();
+    const formattedName = toTitleCase(name);
+    const existingItem = findExistingItem(formattedName);
 
-    // Check if already exists
-    if (pantryItems.some(p => p.name.toLowerCase() === name.toLowerCase())) {
-      return; // Already in pantry
+    if (existingItem) {
+      // Show confirmation for quick add too
+      const confirmed = window.confirm(
+        `You already have "${existingItem.name}" in your pantry (quantity: ${existingItem.quantity || 1}).\n\nDo you want to add 1 more?`
+      );
+
+      if (confirmed) {
+        const newQuantity = (existingItem.quantity || 1) + 1;
+        const { error } = await supabase
+          .from('pantry')
+          .update({ quantity: newQuantity })
+          .eq('id', existingItem.id);
+
+        if (error) {
+          console.error('Error updating item:', error.message);
+        } else {
+          setPantryItems(prev =>
+            prev.map(item =>
+              item.id === existingItem.id
+                ? { ...item, quantity: newQuantity }
+                : item
+            )
+          );
+        }
+      }
+      return;
     }
 
     const { data, error } = await supabase
       .from('pantry')
       .insert({
-        name: name,
+        name: formattedName,
+        quantity: 1,
         category: category,
         user_id: user.id
       })
@@ -167,6 +242,13 @@ export default function PantryPage() {
             value={newItemName}
             onChange={(e) => setNewItemName(e.target.value)}
           />
+          <input
+            type="number"
+            className="quantity-input"
+            min="1"
+            value={newItemQuantity}
+            onChange={(e) => setNewItemQuantity(Number(e.target.value))}
+          />
           <select
             className="category-select"
             value={newItemCategory}
@@ -204,8 +286,7 @@ export default function PantryPage() {
                         <button
                           key={item}
                           className={`suggestion-chip ${isInPantry ? 'in-pantry' : ''}`}
-                          onClick={() => !isInPantry && addQuickItem(item, category)}
-                          disabled={isInPantry}
+                          onClick={() => addQuickItem(item, category)}
                         >
                           {isInPantry ? '✓ ' : '+ '}{item}
                         </button>
@@ -244,7 +325,10 @@ export default function PantryPage() {
                   <ul className="pantry-list">
                     {categoryItems.map(item => (
                       <li key={item.id} className="pantry-item">
-                        <span className="pantry-item-name">{item.name}</span>
+                        <div className="pantry-item-content">
+                          <span className="pantry-item-quantity">{item.quantity || 1}</span>
+                          <span className="pantry-item-name">{item.name}</span>
+                        </div>
                         <button
                           onClick={() => deleteItem(item.id)}
                           className="item-delete-btn"

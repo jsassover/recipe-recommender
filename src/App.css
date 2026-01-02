@@ -743,6 +743,26 @@
   background-color: var(--color-surface);
 }
 
+.pantry-item-content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.pantry-item-quantity {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 var(--space-sm);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  background-color: var(--color-primary-light);
+  border-radius: var(--radius-full);
+}
+
 .pantry-item-name {
   font-size: 0.938rem;
   color: var(--color-text);
