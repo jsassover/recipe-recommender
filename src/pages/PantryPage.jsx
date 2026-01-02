@@ -1,30 +1,7 @@
 // src/pages/PantryPage.jsx
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-
-// Category order for display
-const CATEGORY_ORDER = [
-  'Produce',
-  'Meat & Seafood',
-  'Dairy & Eggs',
-  'Bakery & Bread',
-  'Frozen',
-  'Pantry',
-  'Beverages',
-  'Other'
-];
-
-// Category icons
-const CATEGORY_ICONS = {
-  'Produce': '🥬',
-  'Meat & Seafood': '🥩',
-  'Dairy & Eggs': '🥛',
-  'Bakery & Bread': '🍞',
-  'Frozen': '❄️',
-  'Pantry': '🥫',
-  'Beverages': '🥤',
-  'Other': '📦'
-};
+import { CATEGORY_ORDER, CATEGORY_ICONS, groupByCategory } from '../utils/categories';
 
 // Common pantry staples for quick add
 const COMMON_STAPLES = {
@@ -41,34 +18,6 @@ function toTitleCase(str) {
     .split(' ')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
-}
-
-// Group items by category
-function groupByCategory(items) {
-  const grouped = {};
-
-  items.forEach(item => {
-    const category = item.category || 'Other';
-    if (!grouped[category]) {
-      grouped[category] = [];
-    }
-    grouped[category].push(item);
-  });
-
-  const sortedGrouped = {};
-  CATEGORY_ORDER.forEach(cat => {
-    if (grouped[cat]) {
-      sortedGrouped[cat] = grouped[cat];
-    }
-  });
-
-  Object.keys(grouped).forEach(cat => {
-    if (!sortedGrouped[cat]) {
-      sortedGrouped[cat] = grouped[cat];
-    }
-  });
-
-  return sortedGrouped;
 }
 
 export default function PantryPage() {

@@ -1,60 +1,7 @@
 // src/pages/ShoppingListPage.jsx
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-
-// Category order for display
-const CATEGORY_ORDER = [
-  'Produce',
-  'Meat & Seafood',
-  'Dairy & Eggs',
-  'Bakery & Bread',
-  'Frozen',
-  'Pantry',
-  'Beverages',
-  'Other'
-];
-
-// Category icons
-const CATEGORY_ICONS = {
-  'Produce': '🥬',
-  'Meat & Seafood': '🥩',
-  'Dairy & Eggs': '🥛',
-  'Bakery & Bread': '🍞',
-  'Frozen': '❄️',
-  'Pantry': '🥫',
-  'Beverages': '🥤',
-  'Other': '📦'
-};
-
-// Group items by category
-function groupByCategory(items) {
-  const grouped = {};
-
-  items.forEach(item => {
-    const category = item.category || 'Other';
-    if (!grouped[category]) {
-      grouped[category] = [];
-    }
-    grouped[category].push(item);
-  });
-
-  // Sort categories by predefined order
-  const sortedGrouped = {};
-  CATEGORY_ORDER.forEach(cat => {
-    if (grouped[cat]) {
-      sortedGrouped[cat] = grouped[cat];
-    }
-  });
-
-  // Add any categories not in the predefined order
-  Object.keys(grouped).forEach(cat => {
-    if (!sortedGrouped[cat]) {
-      sortedGrouped[cat] = grouped[cat];
-    }
-  });
-
-  return sortedGrouped;
-}
+import { CATEGORY_ICONS, groupByCategory } from '../utils/categories';
 
 export default function ShoppingListPage() {
   const [items, setItems] = useState([]);
