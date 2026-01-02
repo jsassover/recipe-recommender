@@ -120,8 +120,8 @@
 }
 
 .add-item-form .item-name-input {
-  flex: 1;
-  min-width: 0;
+  flex: 3;
+  min-width: 200px;
 }
 
 .add-item-form .quantity-input {
@@ -644,7 +644,8 @@
   border-radius: var(--radius-sm);
   background-color: var(--color-background);
   color: var(--color-text);
-  min-width: 140px;
+  width: 120px;
+  flex-shrink: 0;
 }
 
 .category-select:focus {
