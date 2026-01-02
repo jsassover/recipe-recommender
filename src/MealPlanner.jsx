@@ -2,6 +2,13 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 
+// Meal type icons for placeholder
+const MEAL_ICONS = {
+  'Breakfast': '🍳',
+  'Lunch': '🥗',
+  'Dinner': '🍽️'
+};
+
 // Helper to group meals by day
 function groupMealsByDay(meals) {
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -17,6 +24,7 @@ function groupMealsByDay(meals) {
         id: meal.id,
         recipe_name: meal.recipe_name,
         recipe_url: meal.recipe_url,
+        image_url: meal.image_url,
         user_id: meal.user_id
       };
     }
@@ -37,7 +45,8 @@ function MealPlanSkeleton() {
             {[...Array(3)].map((_, j) => (
               <div key={j} className="meal-cell">
                 <div className="skeleton skeleton-text" style={{ width: '60px', height: '12px' }}></div>
-                <div className="skeleton" style={{ height: '36px', marginTop: '8px' }}></div>
+                <div className="skeleton" style={{ height: '80px', marginBottom: '8px' }}></div>
+                <div className="skeleton" style={{ height: '36px' }}></div>
               </div>
             ))}
           </div>
@@ -64,7 +73,7 @@ export default function MealPlanner() {
     setError(null);
     const { data, error } = await supabase
       .from('meal_plan')
-      .select('id, day_of_week, meal_type, recipe_name, recipe_url, user_id')
+      .select('id, day_of_week, meal_type, recipe_name, recipe_url, image_url, user_id')
       .order('day_of_week');
 
     if (error) {
@@ -101,7 +110,8 @@ export default function MealPlanner() {
         [mealType]: {
           ...prevPlan[day][mealType],
           recipe_name: newName,
-          recipe_url: null
+          recipe_url: null,
+          image_url: null
         }
       }
     }));
@@ -156,6 +166,7 @@ export default function MealPlanner() {
           [mealType]: {
             ...prevPlan[day][mealType],
             recipe_url: data.newUrl,
+            image_url: data.imageUrl || null
           }
         }
       }));
@@ -190,6 +201,9 @@ export default function MealPlanner() {
       return (
         <div className="meal-cell">
           <span className="meal-type-label">{mealType}</span>
+          <div className="meal-image-container">
+            <div className="meal-image-placeholder">{MEAL_ICONS[mealType]}</div>
+          </div>
           <div className="skeleton" style={{ height: '36px' }}></div>
         </div>
       );
@@ -198,6 +212,21 @@ export default function MealPlanner() {
     return (
       <div className="meal-cell">
         <span className="meal-type-label">{mealType}</span>
+
+        {/* Meal Image */}
+        <div className="meal-image-container">
+          {meal.image_url ? (
+            <img
+              src={meal.image_url}
+              alt={meal.recipe_name}
+              className="meal-image"
+              loading="lazy"
+            />
+          ) : (
+            <div className="meal-image-placeholder">{MEAL_ICONS[mealType]}</div>
+          )}
+        </div>
+
         <input
           type="text"
           className="meal-name-input"

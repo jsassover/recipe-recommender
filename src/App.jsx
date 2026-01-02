@@ -6,6 +6,60 @@ import { ThemeSupa } from '@supabase/auth-ui-shared';
 import MealPlanner from './MealPlanner';
 import './App.css';
 
+// Category order for display
+const CATEGORY_ORDER = [
+  'Produce',
+  'Meat & Seafood',
+  'Dairy & Eggs',
+  'Bakery & Bread',
+  'Frozen',
+  'Pantry',
+  'Beverages',
+  'Other'
+];
+
+// Category icons
+const CATEGORY_ICONS = {
+  'Produce': '🥬',
+  'Meat & Seafood': '🥩',
+  'Dairy & Eggs': '🥛',
+  'Bakery & Bread': '🍞',
+  'Frozen': '❄️',
+  'Pantry': '🥫',
+  'Beverages': '🥤',
+  'Other': '📦'
+};
+
+// Group items by category
+function groupByCategory(items) {
+  const grouped = {};
+
+  items.forEach(item => {
+    const category = item.category || 'Other';
+    if (!grouped[category]) {
+      grouped[category] = [];
+    }
+    grouped[category].push(item);
+  });
+
+  // Sort categories by predefined order
+  const sortedGrouped = {};
+  CATEGORY_ORDER.forEach(cat => {
+    if (grouped[cat]) {
+      sortedGrouped[cat] = grouped[cat];
+    }
+  });
+
+  // Add any categories not in the predefined order
+  Object.keys(grouped).forEach(cat => {
+    if (!sortedGrouped[cat]) {
+      sortedGrouped[cat] = grouped[cat];
+    }
+  });
+
+  return sortedGrouped;
+}
+
 // --- THE SHOPPING LIST COMPONENT ---
 function ShoppingListApp({ session }) {
   const [items, setItems] = useState([]);
@@ -13,6 +67,7 @@ function ShoppingListApp({ session }) {
   const [newItemQuantity, setNewItemQuantity] = useState(1);
   const [selectedItems, setSelectedItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState('category'); // 'category' or 'list'
   const user = session.user;
 
   useEffect(() => {
@@ -122,6 +177,33 @@ function ShoppingListApp({ session }) {
   };
 
   const isAllSelected = items.length > 0 && selectedItems.length === items.length;
+  const groupedItems = groupByCategory(items);
+  const hasCategories = Object.keys(groupedItems).some(cat => cat !== 'Other' && groupedItems[cat]?.length > 0);
+
+  const renderShoppingItem = (item) => (
+    <li
+      key={item.id}
+      className={`shopping-item ${selectedItems.includes(item.id) ? 'checked' : ''}`}
+    >
+      <input
+        type="checkbox"
+        className="item-checkbox"
+        checked={selectedItems.includes(item.id)}
+        onChange={() => handleCheckboxChange(item.id)}
+      />
+      <div className="item-content">
+        <span className="item-quantity-badge">{item.quantity}</span>
+        <span className="item-text">{item.name}</span>
+      </div>
+      <button
+        onClick={() => deleteItem(item.id)}
+        className="item-delete-btn"
+        aria-label="Delete item"
+      >
+        ×
+      </button>
+    </li>
+  );
 
   return (
     <div className="app">
@@ -140,7 +222,25 @@ function ShoppingListApp({ session }) {
       <main className="main-content container">
         {/* Shopping List Section */}
         <section className="shopping-section">
-          <h2>Shopping List</h2>
+          <div className="section-header">
+            <h2>Shopping List</h2>
+            {items.length > 0 && hasCategories && (
+              <div className="view-toggle">
+                <button
+                  className={`view-toggle-btn ${viewMode === 'category' ? 'active' : ''}`}
+                  onClick={() => setViewMode('category')}
+                >
+                  By Category
+                </button>
+                <button
+                  className={`view-toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
+                  onClick={() => setViewMode('list')}
+                >
+                  All Items
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Add Item Form */}
           <form onSubmit={addItem} className="add-item-form">
@@ -206,32 +306,26 @@ function ShoppingListApp({ session }) {
                 <h3>Your list is empty</h3>
                 <p>Add items above to get started!</p>
               </div>
-            ) : (
-              <ul className="shopping-list">
-                {items.map(item => (
-                  <li
-                    key={item.id}
-                    className={`shopping-item ${selectedItems.includes(item.id) ? 'checked' : ''}`}
-                  >
-                    <input
-                      type="checkbox"
-                      className="item-checkbox"
-                      checked={selectedItems.includes(item.id)}
-                      onChange={() => handleCheckboxChange(item.id)}
-                    />
-                    <div className="item-content">
-                      <span className="item-quantity-badge">{item.quantity}</span>
-                      <span className="item-text">{item.name}</span>
+            ) : viewMode === 'category' && hasCategories ? (
+              // Grouped by category view
+              <div className="category-list">
+                {Object.entries(groupedItems).map(([category, categoryItems]) => (
+                  <div key={category} className="category-group">
+                    <div className="category-header">
+                      <span className="category-icon">{CATEGORY_ICONS[category] || '📦'}</span>
+                      <span className="category-name">{category}</span>
+                      <span className="category-count">{categoryItems.length}</span>
                     </div>
-                    <button
-                      onClick={() => deleteItem(item.id)}
-                      className="item-delete-btn"
-                      aria-label="Delete item"
-                    >
-                      ×
-                    </button>
-                  </li>
+                    <ul className="shopping-list">
+                      {categoryItems.map(renderShoppingItem)}
+                    </ul>
+                  </div>
                 ))}
+              </div>
+            ) : (
+              // Flat list view
+              <ul className="shopping-list">
+                {items.map(renderShoppingItem)}
               </ul>
             )}
           </div>
