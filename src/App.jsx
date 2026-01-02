@@ -1,209 +1,19 @@
 // src/App.jsx
 import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
 import { supabase } from './supabaseClient';
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
-import MealPlanner from './MealPlanner';
+import MealPlanPage from './pages/MealPlanPage';
+import ShoppingListPage from './pages/ShoppingListPage';
+import PantryPage from './pages/PantryPage';
 import './App.css';
 
-// Category order for display
-const CATEGORY_ORDER = [
-  'Produce',
-  'Meat & Seafood',
-  'Dairy & Eggs',
-  'Bakery & Bread',
-  'Frozen',
-  'Pantry',
-  'Beverages',
-  'Other'
-];
-
-// Category icons
-const CATEGORY_ICONS = {
-  'Produce': '🥬',
-  'Meat & Seafood': '🥩',
-  'Dairy & Eggs': '🥛',
-  'Bakery & Bread': '🍞',
-  'Frozen': '❄️',
-  'Pantry': '🥫',
-  'Beverages': '🥤',
-  'Other': '📦'
-};
-
-// Group items by category
-function groupByCategory(items) {
-  const grouped = {};
-
-  items.forEach(item => {
-    const category = item.category || 'Other';
-    if (!grouped[category]) {
-      grouped[category] = [];
-    }
-    grouped[category].push(item);
-  });
-
-  // Sort categories by predefined order
-  const sortedGrouped = {};
-  CATEGORY_ORDER.forEach(cat => {
-    if (grouped[cat]) {
-      sortedGrouped[cat] = grouped[cat];
-    }
-  });
-
-  // Add any categories not in the predefined order
-  Object.keys(grouped).forEach(cat => {
-    if (!sortedGrouped[cat]) {
-      sortedGrouped[cat] = grouped[cat];
-    }
-  });
-
-  return sortedGrouped;
-}
-
-// --- THE SHOPPING LIST COMPONENT ---
-function ShoppingListApp({ session }) {
-  const [items, setItems] = useState([]);
-  const [newItemName, setNewItemName] = useState('');
-  const [newItemQuantity, setNewItemQuantity] = useState(1);
-  const [selectedItems, setSelectedItems] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [viewMode, setViewMode] = useState('category'); // 'category' or 'list'
-  const user = session.user;
-
-  useEffect(() => {
-    fetchItems();
-  }, []);
-
-  const fetchItems = async () => {
-    setIsLoading(true);
-    const { data, error } = await supabase
-      .from('shopping_list')
-      .select('*')
-      .order('id', { ascending: true });
-
-    if (error) console.error('Error fetching items:', error);
-    else setItems(data);
-    setIsLoading(false);
-  };
-
-  const addItem = async (e) => {
-    e.preventDefault();
-    if (newItemName.trim() === '') return;
-
-    const { data, error } = await supabase
-      .from('shopping_list')
-      .insert({
-        name: newItemName,
-        quantity: newItemQuantity,
-        user_id: user.id
-      })
-      .select();
-
-    if (error) {
-      console.error('Error adding item:', error.message);
-    } else {
-      setItems(prevItems => [...prevItems, data[0]]);
-      setNewItemName('');
-      setNewItemQuantity(1);
-    }
-  };
-
-  const handleCheckboxChange = (itemId) => {
-    if (selectedItems.includes(itemId)) {
-      setSelectedItems(prev => prev.filter(id => id !== itemId));
-    } else {
-      setSelectedItems(prev => [...prev, itemId]);
-    }
-  };
-
-  const handleSelectAll = () => {
-    if (selectedItems.length === items.length) {
-      setSelectedItems([]);
-    } else {
-      setSelectedItems(items.map(item => item.id));
-    }
-  };
-
-  const deleteSelectedItems = async () => {
-    if (selectedItems.length === 0) return;
-
-    const { error } = await supabase
-      .from('shopping_list')
-      .delete()
-      .in('id', selectedItems);
-
-    if (error) {
-      console.error('Error deleting items:', error);
-      alert("Failed to delete items.");
-    } else {
-      setItems(prevItems => prevItems.filter(item => !selectedItems.includes(item.id)));
-      setSelectedItems([]);
-    }
-  };
-
-  const deleteItem = async (itemId) => {
-    const { error } = await supabase
-      .from('shopping_list')
-      .delete()
-      .eq('id', itemId);
-
-    if (error) console.error('Error deleting item:', error);
-    else setItems(prevItems => prevItems.filter(item => item.id !== itemId));
-  };
-
-  const handleOrder = async () => {
-    console.log('Building Instacart cart...');
-    const itemsPayload = items.map(item => ({
-        name: item.name,
-        quantity: item.quantity
-    }));
-    const { data, error } = await supabase.functions.invoke('checkout-handler', { body: { items: itemsPayload } });
-
-    if (error) {
-      console.error('Error from function:', error.message);
-      alert(`Error: ${error.message}`);
-    }
-
-    if (data && data.checkoutUrl) {
-      console.log('SUCCESS! Got checkout URL:', data.checkoutUrl);
-      window.open(data.checkoutUrl, '_blank');
-    } else if (data) {
-      alert(`Error: ${data.error || 'Could not create cart.'}`);
-    }
-  };
-
+// --- THE MAIN APP LAYOUT WITH NAVIGATION ---
+function AppLayout({ session }) {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
   };
-
-  const isAllSelected = items.length > 0 && selectedItems.length === items.length;
-  const groupedItems = groupByCategory(items);
-  const hasCategories = Object.keys(groupedItems).some(cat => cat !== 'Other' && groupedItems[cat]?.length > 0);
-
-  const renderShoppingItem = (item) => (
-    <li
-      key={item.id}
-      className={`shopping-item ${selectedItems.includes(item.id) ? 'checked' : ''}`}
-    >
-      <input
-        type="checkbox"
-        className="item-checkbox"
-        checked={selectedItems.includes(item.id)}
-        onChange={() => handleCheckboxChange(item.id)}
-      />
-      <div className="item-content">
-        <span className="item-quantity-badge">{item.quantity}</span>
-        <span className="item-text">{item.name}</span>
-      </div>
-      <button
-        onClick={() => deleteItem(item.id)}
-        className="item-delete-btn"
-        aria-label="Delete item"
-      >
-        ×
-      </button>
-    </li>
-  );
 
   return (
     <div className="app">
@@ -218,137 +28,30 @@ function ShoppingListApp({ session }) {
         </div>
       </header>
 
+      {/* Navigation Tabs */}
+      <nav className="app-nav">
+        <NavLink to="/" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`} end>
+          <span className="nav-icon">📅</span>
+          <span className="nav-label">Meal Plan</span>
+        </NavLink>
+        <NavLink to="/shopping" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+          <span className="nav-icon">🛒</span>
+          <span className="nav-label">Shopping List</span>
+        </NavLink>
+        <NavLink to="/pantry" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+          <span className="nav-icon">🏠</span>
+          <span className="nav-label">Pantry</span>
+        </NavLink>
+      </nav>
+
       {/* Main Content */}
       <main className="main-content container">
-        {/* Shopping List Section */}
-        <section className="shopping-section">
-          <div className="section-header">
-            <h2>Shopping List</h2>
-            {items.length > 0 && hasCategories && (
-              <div className="view-toggle">
-                <button
-                  className={`view-toggle-btn ${viewMode === 'category' ? 'active' : ''}`}
-                  onClick={() => setViewMode('category')}
-                >
-                  By Category
-                </button>
-                <button
-                  className={`view-toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
-                  onClick={() => setViewMode('list')}
-                >
-                  All Items
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Add Item Form */}
-          <form onSubmit={addItem} className="add-item-form">
-            <input
-              type="text"
-              className="item-name-input"
-              placeholder="Add an item (e.g., Apples)"
-              value={newItemName}
-              onChange={(e) => setNewItemName(e.target.value)}
-            />
-            <input
-              type="number"
-              className="quantity-input"
-              min="1"
-              value={newItemQuantity}
-              onChange={(e) => setNewItemQuantity(Number(e.target.value))}
-            />
-            <button type="submit" className="btn-primary">
-              Add
-            </button>
-          </form>
-
-          {/* Shopping List Container */}
-          <div className="shopping-list-container">
-            {/* List Actions Bar */}
-            {items.length > 0 && (
-              <div className="list-actions">
-                <div className="list-actions-left">
-                  <button
-                    onClick={handleSelectAll}
-                    className="btn-ghost btn-sm"
-                  >
-                    {isAllSelected ? "Deselect All" : "Select All"}
-                  </button>
-                  {selectedItems.length > 0 && (
-                    <span className="select-count">
-                      {selectedItems.length} selected
-                    </span>
-                  )}
-                </div>
-                <div className="list-actions-right">
-                  {selectedItems.length > 0 && (
-                    <button
-                      onClick={deleteSelectedItems}
-                      className="btn-danger btn-sm"
-                    >
-                      Delete Selected
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Shopping List */}
-            {isLoading ? (
-              <div className="empty-state">
-                <div className="loading-spinner"></div>
-                <p className="mt-md">Loading your list...</p>
-              </div>
-            ) : items.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-state-icon">🛒</div>
-                <h3>Your list is empty</h3>
-                <p>Add items above to get started!</p>
-              </div>
-            ) : viewMode === 'category' && hasCategories ? (
-              // Grouped by category view
-              <div className="category-list">
-                {Object.entries(groupedItems).map(([category, categoryItems]) => (
-                  <div key={category} className="category-group">
-                    <div className="category-header">
-                      <span className="category-icon">{CATEGORY_ICONS[category] || '📦'}</span>
-                      <span className="category-name">{category}</span>
-                      <span className="category-count">{categoryItems.length}</span>
-                    </div>
-                    <ul className="shopping-list">
-                      {categoryItems.map(renderShoppingItem)}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              // Flat list view
-              <ul className="shopping-list">
-                {items.map(renderShoppingItem)}
-              </ul>
-            )}
-          </div>
-        </section>
-
-        {/* Section Divider */}
-        <div className="section-divider">
-          <span>Meal Planning</span>
-        </div>
-
-        {/* Meal Planner Component */}
-        <MealPlanner onIngredientsAdded={fetchItems} />
+        <Routes>
+          <Route path="/" element={<MealPlanPage />} />
+          <Route path="/shopping" element={<ShoppingListPage />} />
+          <Route path="/pantry" element={<PantryPage />} />
+        </Routes>
       </main>
-
-      {/* Sticky Order Footer */}
-      {items.length > 0 && (
-        <div className="sticky-order-footer">
-          <button onClick={handleOrder} className="order-button">
-            <span>🛒</span>
-            Order with Instacart ({items.length} items)
-          </button>
-        </div>
-      )}
     </div>
   );
 }
@@ -392,7 +95,11 @@ function App() {
       </div>
     )
   } else {
-    return <ShoppingListApp session={session} />
+    return (
+      <BrowserRouter>
+        <AppLayout session={session} />
+      </BrowserRouter>
+    );
   }
 }
 

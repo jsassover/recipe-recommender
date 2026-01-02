@@ -1,0 +1,266 @@
+// src/pages/PantryPage.jsx
+import { useState, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
+
+// Category order for display
+const CATEGORY_ORDER = [
+  'Produce',
+  'Meat & Seafood',
+  'Dairy & Eggs',
+  'Bakery & Bread',
+  'Frozen',
+  'Pantry',
+  'Beverages',
+  'Other'
+];
+
+// Category icons
+const CATEGORY_ICONS = {
+  'Produce': '🥬',
+  'Meat & Seafood': '🥩',
+  'Dairy & Eggs': '🥛',
+  'Bakery & Bread': '🍞',
+  'Frozen': '❄️',
+  'Pantry': '🥫',
+  'Beverages': '🥤',
+  'Other': '📦'
+};
+
+// Common pantry staples for quick add
+const COMMON_STAPLES = {
+  'Pantry': ['Salt', 'Pepper', 'Olive Oil', 'Vegetable Oil', 'Sugar', 'Flour', 'Rice', 'Pasta', 'Soy Sauce', 'Vinegar', 'Honey', 'Garlic Powder', 'Onion Powder', 'Paprika', 'Cumin', 'Cinnamon', 'Vanilla Extract', 'Baking Soda', 'Baking Powder'],
+  'Dairy & Eggs': ['Butter', 'Eggs', 'Milk'],
+  'Produce': ['Garlic', 'Onions', 'Lemons'],
+  'Beverages': ['Coffee', 'Tea']
+};
+
+// Group items by category
+function groupByCategory(items) {
+  const grouped = {};
+
+  items.forEach(item => {
+    const category = item.category || 'Other';
+    if (!grouped[category]) {
+      grouped[category] = [];
+    }
+    grouped[category].push(item);
+  });
+
+  const sortedGrouped = {};
+  CATEGORY_ORDER.forEach(cat => {
+    if (grouped[cat]) {
+      sortedGrouped[cat] = grouped[cat];
+    }
+  });
+
+  Object.keys(grouped).forEach(cat => {
+    if (!sortedGrouped[cat]) {
+      sortedGrouped[cat] = grouped[cat];
+    }
+  });
+
+  return sortedGrouped;
+}
+
+export default function PantryPage() {
+  const [pantryItems, setPantryItems] = useState([]);
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemCategory, setNewItemCategory] = useState('Pantry');
+  const [isLoading, setIsLoading] = useState(true);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  useEffect(() => {
+    fetchPantryItems();
+  }, []);
+
+  const fetchPantryItems = async () => {
+    setIsLoading(true);
+    const { data, error } = await supabase
+      .from('pantry')
+      .select('*')
+      .order('category', { ascending: true })
+      .order('name', { ascending: true });
+
+    if (error) console.error('Error fetching pantry:', error);
+    else setPantryItems(data || []);
+    setIsLoading(false);
+  };
+
+  const addItem = async (e) => {
+    e.preventDefault();
+    if (newItemName.trim() === '') return;
+
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const { data, error } = await supabase
+      .from('pantry')
+      .insert({
+        name: newItemName.trim(),
+        category: newItemCategory,
+        user_id: user.id
+      })
+      .select();
+
+    if (error) {
+      if (error.code === '23505') {
+        alert('This item is already in your pantry!');
+      } else {
+        console.error('Error adding item:', error.message);
+      }
+    } else {
+      setPantryItems(prev => [...prev, data[0]]);
+      setNewItemName('');
+    }
+  };
+
+  const addQuickItem = async (name, category) => {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // Check if already exists
+    if (pantryItems.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+      return; // Already in pantry
+    }
+
+    const { data, error } = await supabase
+      .from('pantry')
+      .insert({
+        name: name,
+        category: category,
+        user_id: user.id
+      })
+      .select();
+
+    if (error) {
+      console.error('Error adding item:', error.message);
+    } else {
+      setPantryItems(prev => [...prev, data[0]]);
+    }
+  };
+
+  const deleteItem = async (itemId) => {
+    const { error } = await supabase
+      .from('pantry')
+      .delete()
+      .eq('id', itemId);
+
+    if (error) console.error('Error deleting item:', error);
+    else setPantryItems(prev => prev.filter(item => item.id !== itemId));
+  };
+
+  const groupedItems = groupByCategory(pantryItems);
+  const pantryNames = pantryItems.map(p => p.name.toLowerCase());
+
+  return (
+    <div className="page-container">
+      <section className="pantry-section">
+        <div className="section-header">
+          <h2>My Pantry</h2>
+          <p className="section-subtitle">Items you always have on hand</p>
+        </div>
+
+        {/* Add Item Form */}
+        <form onSubmit={addItem} className="add-item-form">
+          <input
+            type="text"
+            className="item-name-input"
+            placeholder="Add a pantry item..."
+            value={newItemName}
+            onChange={(e) => setNewItemName(e.target.value)}
+          />
+          <select
+            className="category-select"
+            value={newItemCategory}
+            onChange={(e) => setNewItemCategory(e.target.value)}
+          >
+            {CATEGORY_ORDER.map(cat => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+          <button type="submit" className="btn-primary">
+            Add
+          </button>
+        </form>
+
+        {/* Quick Add Suggestions */}
+        <div className="quick-add-section">
+          <button
+            className="btn-ghost btn-sm"
+            onClick={() => setShowSuggestions(!showSuggestions)}
+          >
+            {showSuggestions ? 'Hide Suggestions' : 'Show Common Staples'}
+          </button>
+
+          {showSuggestions && (
+            <div className="suggestions-container">
+              {Object.entries(COMMON_STAPLES).map(([category, items]) => (
+                <div key={category} className="suggestion-category">
+                  <span className="suggestion-category-label">
+                    {CATEGORY_ICONS[category]} {category}
+                  </span>
+                  <div className="suggestion-chips">
+                    {items.map(item => {
+                      const isInPantry = pantryNames.includes(item.toLowerCase());
+                      return (
+                        <button
+                          key={item}
+                          className={`suggestion-chip ${isInPantry ? 'in-pantry' : ''}`}
+                          onClick={() => !isInPantry && addQuickItem(item, category)}
+                          disabled={isInPantry}
+                        >
+                          {isInPantry ? '✓ ' : '+ '}{item}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Pantry Items */}
+        <div className="pantry-list-container">
+          {isLoading ? (
+            <div className="empty-state">
+              <div className="loading-spinner"></div>
+              <p className="mt-md">Loading your pantry...</p>
+            </div>
+          ) : pantryItems.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state-icon">🏠</div>
+              <h3>Your pantry is empty</h3>
+              <p>Add items you always have on hand, like salt, oil, and spices.</p>
+              <p>These items will be marked as "In Pantry" on your shopping list.</p>
+            </div>
+          ) : (
+            <div className="category-list">
+              {Object.entries(groupedItems).map(([category, categoryItems]) => (
+                <div key={category} className="category-group">
+                  <div className="category-header">
+                    <span className="category-icon">{CATEGORY_ICONS[category] || '📦'}</span>
+                    <span className="category-name">{category}</span>
+                    <span className="category-count">{categoryItems.length}</span>
+                  </div>
+                  <ul className="pantry-list">
+                    {categoryItems.map(item => (
+                      <li key={item.id} className="pantry-item">
+                        <span className="pantry-item-name">{item.name}</span>
+                        <button
+                          onClick={() => deleteItem(item.id)}
+                          className="item-delete-btn"
+                          aria-label="Remove from pantry"
+                        >
+                          ×
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}

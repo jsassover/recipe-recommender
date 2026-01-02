@@ -16,6 +16,66 @@
   padding-bottom: 100px; /* Space for sticky footer */
 }
 
+/* Page Container */
+.page-container {
+  max-width: 100%;
+}
+
+/* Navigation Tabs */
+.app-nav {
+  display: flex;
+  background-color: var(--color-background);
+  border-bottom: 1px solid var(--color-border-light);
+  padding: 0 var(--space-md);
+  position: sticky;
+  top: 60px;
+  z-index: 40;
+}
+
+.nav-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-sm) var(--space-lg);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: all var(--transition-fast);
+}
+
+.nav-tab:hover {
+  color: var(--color-primary);
+  background-color: var(--color-surface);
+}
+
+.nav-tab.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.nav-icon {
+  font-size: 1.25rem;
+}
+
+.nav-label {
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .nav-tab {
+    flex-direction: row;
+    gap: var(--space-sm);
+    font-size: 0.875rem;
+  }
+
+  .nav-icon {
+    font-size: 1rem;
+  }
+}
+
 /* Auth Container */
 .auth-container {
   display: flex;
@@ -560,4 +620,149 @@
   --space-inputPadding: var(--space-sm) var(--space-md);
   --radii-borderRadiusButton: var(--radius-sm);
   --radii-inputBorderRadius: var(--radius-sm);
+}
+
+/* ===========================================
+   PANTRY PAGE STYLES
+   =========================================== */
+
+.pantry-section {
+  margin-bottom: var(--space-xl);
+}
+
+.section-subtitle {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  margin-top: calc(var(--space-xs) * -1);
+  margin-bottom: var(--space-md);
+}
+
+.category-select {
+  padding: var(--space-sm) var(--space-md);
+  font-size: 0.875rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-background);
+  color: var(--color-text);
+  min-width: 140px;
+}
+
+.category-select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+
+/* Quick Add Suggestions */
+.quick-add-section {
+  margin-bottom: var(--space-lg);
+}
+
+.suggestions-container {
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  background-color: var(--color-surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-light);
+}
+
+.suggestion-category {
+  margin-bottom: var(--space-md);
+}
+
+.suggestion-category:last-child {
+  margin-bottom: 0;
+}
+
+.suggestion-category-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: var(--space-sm);
+}
+
+.suggestion-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.suggestion-chip {
+  padding: var(--space-xs) var(--space-sm);
+  font-size: 0.813rem;
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.suggestion-chip:hover:not(.in-pantry) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.suggestion-chip.in-pantry {
+  background-color: var(--color-primary-light);
+  border-color: var(--color-primary-light);
+  color: var(--color-primary);
+  cursor: default;
+}
+
+/* Pantry List */
+.pantry-list-container {
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.pantry-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pantry-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-border-light);
+  transition: background-color var(--transition-fast);
+}
+
+.pantry-item:last-child {
+  border-bottom: none;
+}
+
+.pantry-item:hover {
+  background-color: var(--color-surface);
+}
+
+.pantry-item-name {
+  font-size: 0.938rem;
+  color: var(--color-text);
+}
+
+/* Pantry Badge on Shopping List */
+.pantry-badge {
+  font-size: 0.688rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  background-color: var(--color-primary-light);
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+  margin-left: var(--space-sm);
+}
+
+.shopping-item.in-pantry {
+  background-color: rgba(94, 189, 33, 0.05);
+}
+
+.shopping-item.in-pantry .item-text {
+  color: var(--color-text-muted);
 }
