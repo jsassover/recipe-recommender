@@ -337,7 +337,7 @@ function ShoppingListApp({ session }) {
         </div>
 
         {/* Meal Planner Component */}
-        <MealPlanner />
+        <MealPlanner onIngredientsAdded={fetchItems} />
       </main>
 
       {/* Sticky Order Footer */}

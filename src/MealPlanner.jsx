@@ -57,7 +57,7 @@ function MealPlanSkeleton() {
   );
 }
 
-export default function MealPlanner() {
+export default function MealPlanner({ onIngredientsAdded }) {
   const [mealPlan, setMealPlan] = useState({});
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -190,6 +190,9 @@ export default function MealPlanner() {
       setError('Could not update shopping list. Check logs.');
     } else {
       alert("Success! Added " + data.count + " items to your Shopping List.");
+      if (onIngredientsAdded) {
+        onIngredientsAdded();
+      }
     }
     setLoading(false);
   };
@@ -215,6 +218,9 @@ export default function MealPlanner() {
       setError('Could not add ingredients to shopping list.');
     } else {
       alert(`Added ${data.count} ingredients from "${meal.recipe_name}" to your list!`);
+      if (onIngredientsAdded) {
+        onIngredientsAdded();
+      }
     }
     setAddingIngredientsId(null);
   };
